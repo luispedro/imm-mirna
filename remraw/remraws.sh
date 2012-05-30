@@ -1,21 +1,22 @@
 #!/bin/bash
 
-primfile="prims.txt"
+dir_name=$(dirname ${BASH_SOURCE[0]})
 
-seqs=$(cat $primfile | cut -f1 | tr '\n' ' ')
-nums=$(cat $primfile | cut -f2 | tr '\n' '+' | sed 's/+/ + /g')
-
-target=$(expr ${nums: 0 : -3})
-
-if test $# -lt 2 ; then
-	echo "Syntax: remraws.sh <input filename> <output filename>"
+if [ $# -lt 3 ]; then
+	echo "Syntax: remraws.sh <input filename> <seqs file> <output filename>"
 	exit
 fi
 
 infile=$1
-outfile=$2
+seqsfile=$2
+outfile=$3
 
-cat $infile | python remraw.py $seqs > $outfile 
+seqs=$(cat $seqsfile | cut -f1 | tr '\n' ' ')
+nums=$(cat $seqsfile | cut -f2 | tr '\n' '+' | sed 's/+/ + /g')
+
+target=$(expr ${nums: 0 : -3})
+
+cat $infile | python $dir_name/remraw.py $seqs > $outfile 
 
 # check number of entries removed
 n1=$(wc -l $infile | cut -f1 -d' ')
