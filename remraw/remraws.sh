@@ -12,9 +12,7 @@ seqsfile=$2
 outfile=$3
 
 seqs=$(cat $seqsfile | cut -f1 | tr '\n' ' ')
-nums=$(cat $seqsfile | cut -f2 | tr '\n' '+' | sed 's/+/ + /g')
-
-target=$(expr ${nums: 0 : -3})
+target=$(awk '{ sum += $2; } END { print sum; }' $seqsfile)
 
 cat $infile | python $dir_name/remraw.py $seqs > $outfile 
 
