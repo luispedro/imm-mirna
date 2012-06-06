@@ -20,8 +20,6 @@ if __name__ == '__main__':
 		if not entry[0]:
 			break
 
-		if not markedForRemoval(entry[1][:-1]):
+		if not markedForRemoval(entry[1][:-1]):	# remove newline character
 			print entry[0], entry[1], entry[2], entry[3],
 
-	if inf != sys.stdin:
-		inf.close()
