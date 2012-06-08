@@ -34,8 +34,11 @@ READS2_TRIMMED=$READS2_FILTERED.trimmed
 READS1_SORTED=$READS1_TRIMMED.single
 READS2_SORTED=$READS2_TRIMMED.single
 
-READS1_SAM=$READS1_TRIMMED.sam
-READS2_SAM=$READS2_TRIMMED.sam
+READS1_SAM=$READS1_SORTED.sam
+READS2_SAM=$READS2_SORTED.sam
+
+READS1_COUNTS=$READS1_SORTED.counts.txt
+READS2_COUNTS=$READS2_SORTED.counts.txt
 
 __preprocess_read() {
 	rfile=$1
@@ -110,24 +113,36 @@ generate_index() {
 }
 
 # Align reads
-#	-> $READS1.sam
-#	-> $READS2.sam
+#	-> $READS1_SAM
+#	-> $READS2_SAM
 align_reads() {
 	precision=$1	# Requested alignment precision (100 = perfect alignement)
 
 	echo "Aligning reads..."
-	$CMD_TAPYR $REF_FILTERED_BASENAME.fmi $READS1_SORTED -i $precision
-	$CMD_TAPYR $REF_FILTERED_BASENAME.fmi $READS2_SORTED -i $precision
+	$CMD_TAPYR $REF_FILTERED_BASENAME.fmi $READS1_SORTED -i $precision -o $READS1_SAM
+	$CMD_TAPYR $REF_FILTERED_BASENAME.fmi $READS2_SORTED -i $precision -o $READS2_SAM
+}
+
+generate_counts() {
+	sam=$1 		# SAM file to be processed
+	out=$2		# output file
+
+	echo "Generating counts for "$sam
+	ns=$(cat $REF_FILTERED_BASENAME.fa | grep "^>" -c)
+	cat $sam | grep -v "^@SQ" | awk '{ if ($3 != "*") { print $3 } }' | sed 's/^R//' | awk "{ ++cts[\$1] } END { for (i=0; i<$ns; ++i) { if (cts[i] == \"\") cts[i] = 0; print i, cts[i] } }" > $out
 }
 
 ##############################################################
 
-preprocess_reads
-trim_reads 30
-sort_discard_reads 16
+#preprocess_reads
+#trim_reads 30
+#sort_discard_reads 16
 
-cleanup_reference 
-generate_index
+#cleanup_reference 
+#generate_index
 
-align_reads 100
+#align_reads 100
+
+generate_counts $READS1_SAM $READS1_COUNTS
+generate_counts $READS2_SAM $READS2_COUNTS
 
