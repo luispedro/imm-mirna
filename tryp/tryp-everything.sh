@@ -59,7 +59,7 @@ convert_reads_txt_to_fasta() {
 # Align reads 
 #	-> $READS1_TXT.sam
 #	-> $READS2_TXT.sam
-align_reads_94() {
+align_reads() {
 	precision=$1 	# Requested alignment precision (100 = perfect alignment)
 
 	echo "Aligning reads."
