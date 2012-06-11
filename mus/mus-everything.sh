@@ -3,16 +3,19 @@
 ##############################################################
 
 # TAPyR executable
-CMD_TAPYR="tapyr13beta/tapyr"
+CMD_TAPYR="../tapyr13beta/tapyr"
 
 # FastQC executable
-CMD_FASTQC="FastQC/fastqc"
+CMD_FASTQC="../FastQC/fastqc"
 
 # DynamicTrim executable (http://solexaqa.sourceforge.net/)
-CMD_DYNAMICTRIM="solexaqa/DynamicTrim.pl"
+CMD_DYNAMICTRIM="../solexaqa/DynamicTrim.pl"
 
 # LengthSort executable (http://solexaqa.sourceforge.net/)
-CMD_LENGTHSORT="solexaqa/LengthSort.pl"
+CMD_LENGTHSORT="../solexaqa/LengthSort.pl"
+
+# DESeq R Script (Requires 'R' to be installed) 
+DESEQ_R="mus-deseq.R"
 
 # Mus Musculus genome reference
 REF="ref/Mus_musculus.NCBIM37.67.ncrna.fa"
@@ -40,6 +43,8 @@ READS2_SAM=$READS2_SORTED.sam
 READS1_COUNTS=$READS1_SORTED.counts.txt
 READS2_COUNTS=$READS2_SORTED.counts.txt
 
+DE_OUTPUT="mus-de-binom.txt"
+
 __preprocess_read() {
 	rfile=$1
 	rfile_filtered=$2
@@ -48,10 +53,14 @@ __preprocess_read() {
 	$CMD_FASTQC $rfile --noextract
 	
 	# get list of overrepresented sequences
-	echo "Removing known overrepresented sequences from "$rfile
 	overrep=$(unzip -p ${rfile}_fastqc.zip ${rfile}_fastqc/fastqc_data.txt | sed -n "/Overrepresented/,/>>END_MODULE/p" | head -n-1 | tail -n+3 | grep -v "No Hit")
+	
+	echo "Removing known overrepresented sequences from "$rfile":"
+	echo "$(echo "$overrep" | cut -f4 | sed 's/^/	/')"
+
 	seqs=$(echo "$overrep" | cut -f1 | tr '\n' '|' | sed s/.$//)
 	escseqs=$(echo $seqs | sed 's/|/\\|/g')
+
 	sed -n "h;n; /$escseqs/!{x;p;x;p;n;p;n;p;}; /$escseqs/{n;n;}" $rfile > $rfile_filtered
 
 	# tests
@@ -66,7 +75,7 @@ __preprocess_read() {
 ##############################################################
 
 # Preprocess reads files by running FastQC on them and removing
-# known overrepresented sequencesi
+# known overrepresented sequences
 #	-> $READS1_FILTERED
 #	-> $READS2_FILTERED
 preprocess_reads() {
@@ -123,13 +132,27 @@ align_reads() {
 	$CMD_TAPYR $REF_FILTERED_BASENAME.fmi $READS2_SORTED -i $precision -o $READS2_SAM
 }
 
+# Generate counts
 generate_counts() {
 	sam=$1 		# SAM file to be processed
 	out=$2		# output file
 
 	echo "Generating counts for "$sam
 	ns=$(cat $REF_FILTERED_BASENAME.fa | grep "^>" -c)
-	cat $sam | grep -v "^@SQ" | awk '{ if ($3 != "*") { print $3 } }' | sed 's/^R//' | awk "{ ++cts[\$1] } END { for (i=0; i<$ns; ++i) { if (cts[i] == \"\") cts[i] = 0; print i, cts[i] } }" > $out
+	cat $sam | grep -v "^@SQ" | cut -f3 | sed -n 's/^R//p' | awk "{ ++cts[\$1] } END { for (i=0; i<$ns; ++i) { if (cts[i] == \"\") cts[i] = 0; print i, cts[i] } }" > $out
+
+	# cat Control-3T3.fq.filtered.fq.trimmed.single.sam | grep "^@SQ" | sed -e 's/^.*SP:\(.*\)\tUR.*$/\1/'
+}
+
+# Perform Differential Expression tests.
+perform_de() {
+	echo "Perform Differential Expression tests."
+
+	# call R script 
+	# 	-> mus-de-binom-table.txt
+	R CMD BATCH $DESEQ_R
+
+	cat mus-de-binom-table.txt | cut -f8 | tail -n+2 | paste Control-3T3.fq.filtered.fq.trimmed.single.counts.txt Stimulated_3T3.fq.filtered.fq.trimmed.single.counts.txt - | awk 'BEGIN {print "ID      Ctrl    Stim    pval"} { printf("%-8s%-8s%-8s%-8s\n", $1, $2, $4, $5) }' > "mus-de-binom-compare.txt"
 }
 
 ##############################################################
@@ -146,3 +169,4 @@ generate_counts() {
 generate_counts $READS1_SAM $READS1_COUNTS
 generate_counts $READS2_SAM $READS2_COUNTS
 
+perform_de
